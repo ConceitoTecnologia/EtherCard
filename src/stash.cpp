@@ -1,5 +1,6 @@
 #include <stdarg.h>
-#include <avr/eeprom.h>
+#include "EEPROM.h"
+
 
 #include "stash.h"
 
@@ -175,7 +176,7 @@ void Stash::prepare (const char* fmt PROGMEM, ...) {
             case 'E': {
                 byte* s = (byte*) argval;
                 char d;
-                while ((d = eeprom_read_byte(s++)) != 0)
+                while ((d = EEPROM.eeprom_read_byte(*s++)) != 0)
                     ++arglen;
                 break;
             }
@@ -254,7 +255,7 @@ void Stash::extract (uint16_t offset, uint16_t count, void* buf) {
             c = pgm_read_byte(ptr++);
             break;
         case 'E':
-            c = eeprom_read_byte((byte*) ptr++);
+            c = EEPROM.eeprom_read_byte(*ptr++);
             break;
         case 'H':
             c = ((Stash*) ptr)->get();

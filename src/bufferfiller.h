@@ -5,7 +5,6 @@
 
 #include "EtherCard.h"
 
-
 /** This class populates network send and receive buffers.
 *
 *   This class provides formatted printing into memory. Users can use it to write into send buffers.

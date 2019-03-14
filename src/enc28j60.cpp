@@ -14,10 +14,19 @@
 #include <Wprogram.h> // Arduino 0022
 #endif
 #include "enc28j60.h"
+#include "SPI.h"
+
+#include "EEPROM.h"
+
+//#define SPI_VSPI 1
+
 
 uint16_t ENC28J60::bufferSize;
 bool ENC28J60::broadcast_enabled = false;
 bool ENC28J60::promiscuous_enabled = false;
+
+static const int spiClk = 10000000; // 8 MHz
+SPIClass * SpiPtr = NULL;
 
 // ENC28J60 Control Registers
 // Control register definitions are a combination of address,
@@ -232,18 +241,25 @@ static byte Enc28j60Bank;
 static byte selectPin;
 
 void ENC28J60::initSPI () {
-    pinMode(SS, OUTPUT);
-    digitalWrite(SS, HIGH);
-    pinMode(MOSI, OUTPUT);
-    pinMode(SCK, OUTPUT);
-    pinMode(MISO, INPUT);
 
-    digitalWrite(MOSI, HIGH);
-    digitalWrite(MOSI, LOW);
-    digitalWrite(SCK, LOW);
-
-    SPCR = bit(SPE) | bit(MSTR); // 8 MHz @ 16
-    bitSet(SPSR, SPI2X);
+	#ifdef SPI_VSPI 
+		selectPin = 5;
+		SpiPtr = new SPIClass(VSPI); //SCLK = 18, MISO = 19, MOSI = 23, SS = 5
+	#else 		
+		selectPin = 15;
+		SpiPtr = new SPIClass(HSPI); //SCLK = 14, MISO = 12, MOSI = 13, SS = 15
+	#endif
+	pinMode(selectPin, OUTPUT);
+	digitalWrite(selectPin, HIGH);
+	SpiPtr->begin();
+	
+	if (!EEPROM.begin(1024)) 
+	{
+		Serial.println("Failed to initialise EEPROM");
+		Serial.println("Restarting...");
+		delay(1000);
+		ESP.restart();
+	}
 }
 
 static void enableChip () {
@@ -257,66 +273,68 @@ static void disableChip () {
 }
 
 static void xferSPI (byte data) {
+	/*
     SPDR = data;
     while (!(SPSR&(1<<SPIF)))
         ;
+	*/
+	//SPI.transfer(data);
 }
 
 static byte readOp (byte op, byte address) {
-    enableChip();
-    xferSPI(op | (address & ADDR_MASK));
-    xferSPI(0x00);
-    if (address & 0x80)
-        xferSPI(0x00);
-    byte result = SPDR;
-    disableChip();
-    return result;
+	uint8_t result=0;
+	enableChip();
+	SpiPtr->beginTransaction(SPISettings(spiClk, MSBFIRST, SPI_MODE0));
+	SpiPtr->transfer(op | (address & ADDR_MASK));  
+	result =  SpiPtr->transfer(0x00);  
+	if (address & 0x80)
+	 result = SpiPtr->transfer(0x00);  
+	SpiPtr->endTransaction();
+	disableChip();
+	return result;
 }
 
 static void writeOp (byte op, byte address, byte data) {
-    enableChip();
-    xferSPI(op | (address & ADDR_MASK));
-    xferSPI(data);
+	enableChip();
+    SpiPtr->beginTransaction(SPISettings(spiClk, MSBFIRST, SPI_MODE0));
+	SpiPtr->transfer(op | (address & ADDR_MASK));
+	SpiPtr->transfer(data);
+	SpiPtr->endTransaction();
     disableChip();
 }
 
 static void readBuf(uint16_t len, byte* data) {
     uint8_t nextbyte;
-
-    enableChip();
-    if (len != 0) {
-        xferSPI(ENC28J60_READ_BUF_MEM);
-
-        SPDR = 0x00;
-        while (--len) {
-            while (!(SPSR & (1<<SPIF)))
-                ;
-            nextbyte = SPDR;
-            SPDR = 0x00;
-            *data++ = nextbyte;
-        }
-        while (!(SPSR & (1<<SPIF)))
-            ;
-        *data++ = SPDR;
+	enableChip();
+	SpiPtr->beginTransaction(SPISettings(spiClk, MSBFIRST, SPI_MODE0));
+	if (len != 0) 
+	{
+		SpiPtr->transfer(ENC28J60_READ_BUF_MEM);
+		while (--len) 
+		{
+			nextbyte = SpiPtr->transfer(0x00);
+			*data++ = nextbyte;
+		}
+		*data++ = nextbyte = SpiPtr->transfer(0x00);
     }
+	SpiPtr->endTransaction();
     disableChip();
 }
 
 static void writeBuf(uint16_t len, const byte* data) {
-    enableChip();
-    if (len != 0) {
-        xferSPI(ENC28J60_WRITE_BUF_MEM);
-
-        SPDR = *data++;
-        while (--len) {
-            uint8_t nextbyte = *data++;
-        	while (!(SPSR & (1<<SPIF)))
-                ;
-            SPDR = nextbyte;
-     	};
-        while (!(SPSR & (1<<SPIF)))
-            ;
+	enableChip();
+	SpiPtr->beginTransaction(SPISettings(spiClk, MSBFIRST, SPI_MODE0));
+	if (len != 0) 
+	{
+		SpiPtr->transfer(ENC28J60_WRITE_BUF_MEM);
+		SpiPtr->transfer(*data++);
+		while (--len) 
+		{
+			uint8_t nextbyte = *data++;
+			SpiPtr->transfer(nextbyte);
+		}
     }
+	SpiPtr->endTransaction();
     disableChip();
 }
 
@@ -365,7 +383,7 @@ static void writePhy (byte address, uint16_t data) {
 
 byte ENC28J60::initialize (uint16_t size, const byte* macaddr, byte csPin) {
     bufferSize = size;
-    if (bitRead(SPCR, SPE) == 0)
+    //if (bitRead(SPCR, SPE) == 0)
         initSPI();
     selectPin = csPin;
     pinMode(selectPin, OUTPUT);
@@ -457,7 +475,7 @@ void ENC28J60::packetSend(uint16_t len) {
     byte retry = 0;
 
     #if ETHERCARD_SEND_PIPELINING
-        goto resume_last_transmission;
+        //goto resume_last_transmission;
     #endif
     while (1) {
         // latest errata sheet: DS80349C
@@ -485,7 +503,7 @@ void ENC28J60::packetSend(uint16_t len) {
             if (retry == 0) return;
         #endif
 
-    resume_last_transmission:
+   // resume_last_transmission:
 
         // wait until transmission has finished; referring to the data sheet and
         // to the errata (Errata Issue 13; Example 1) you only need to wait until either
@@ -653,7 +671,7 @@ uint8_t ENC28J60::doBIST ( byte csPin) {
 #define RANDOM_RACE     0b1100
 
 // init
-    if (bitRead(SPCR, SPE) == 0)
+    //if (bitRead(SPCR, SPE) == 0)
         initSPI();
     selectPin = csPin;
     pinMode(selectPin, OUTPUT);

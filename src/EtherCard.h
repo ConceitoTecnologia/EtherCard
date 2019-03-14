@@ -36,7 +36,11 @@
 #define WRITE_RETURN
 #endif
 
-#include <avr/pgmspace.h>
+#if (defined(__AVR__))
+#include <avr\pgmspace.h>
+#else
+#include <pgmspace.h>
+#endif
 #include "bufferfiller.h"
 #include "enc28j60.h"
 #include "net.h"
