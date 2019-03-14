@@ -38,6 +38,7 @@ See the comments in the example sketches for details about how to try them out.
 ### PIN Connections (Using ESP32 wroom):
 
 If using HSPI (Default)
+
 | ENC28J60 | ESP32       | Notes                                       |
 |----------|-------------|---------------------------------------------|
 | VCC      | Vin(5v)     |                                             |
@@ -48,6 +49,7 @@ If using HSPI (Default)
 | CS       | GPIO15      |                                             |
 
 If using VSPI (Need to uncomment //#define SPI_VSPI 1 from enc28j60.cpp file)
+
 | ENC28J60 | ESP32       | Notes                                       |
 |----------|-------------|---------------------------------------------|
 | VCC      | Vin(5v)     |                                             |
