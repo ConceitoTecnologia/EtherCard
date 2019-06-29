@@ -233,8 +233,8 @@ To send a UDP packet use `ether.sendUdp()`.
 
 ```C
 char payload[] = "My UDP message";
-uint8_t nSourcePort = 1234;
-uint8_t nDestinationPort = 5678;
+uint16_t nSourcePort = 1234;
+uint16_t nDestinationPort = 5678;
 uint8_t ipDestinationAddress[IP_LEN];
 ether.parseIp(ipDestinationAddress, "192.168.0.200");
 
