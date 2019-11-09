@@ -41,7 +41,7 @@ If using HSPI (Default)
 
 | ENC28J60 | ESP32       | Notes                                       |
 |----------|-------------|---------------------------------------------|
-| VCC      | Vin(5v)     |                                             |
+| VCC      | Vin(3v3)    |                                             |
 | GND      | GND         |                                             |
 | SCLK     | GPIO14      |                                             |
 | MISO     | GPIO12      |                                             |
@@ -52,7 +52,7 @@ If using VSPI (Need to uncomment //#define SPI_VSPI 1 from enc28j60.cpp file)
 
 | ENC28J60 | ESP32       | Notes                                       |
 |----------|-------------|---------------------------------------------|
-| VCC      | Vin(5v)     |                                             |
+| VCC      | Vin(3v3)    |                                             |
 | GND      | GND         |                                             |
 | SCLK     | GPIO18      |                                             |
 | MISO     | GPIO19      |                                             |
